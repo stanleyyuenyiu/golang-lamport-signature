@@ -9,12 +9,6 @@ import (
 	"math/big"
 )
 
-type Keys struct {
-	sk [2][256][]byte
-	pk [2][256][]byte
-}
-
-
 type Lamport struct {
 	hashFunc  func() hash.Hash
 	blockSize int
