@@ -50,8 +50,9 @@ func GenerateKey() (*Keys, error)  {
 
 
 
-func Sign(msg []byte, sk [2][256][]byte) [256][]byte {
-	var sig [256][]byte
+func Sign(msg []byte, sk [2][256][]byte) [][]byte {
+	var sig [][]byte
+
 	h := sha256.New()
 	//hashes the message to a 256-bit hash
 	encoded := Hash(h, msg)
@@ -69,13 +70,13 @@ func Sign(msg []byte, sk [2][256][]byte) [256][]byte {
 		b := new(big.Int).And( new(big.Int).Rsh(x, uint(i)), big.NewInt(1) ).Uint64()
 
 		// b = 1 or 0
-        sig[i] = sk[b][i]
+        sig = append(sig, sk[b][i])
 	}
 	return sig
 }
 
 
-func Verify(msg []byte, sig [256][]byte,  pk [2][256][]byte) bool {
+func Verify(msg []byte, sig [][]byte,  pk [2][256][]byte) bool {
 	h := sha256.New()
 	encoded := Hash(h, msg)
 	
