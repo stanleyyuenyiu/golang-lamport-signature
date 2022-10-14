@@ -10,13 +10,15 @@ import (
 )
 
 type Keys struct {
-	privateKeys [2][256][]byte
-	publicKeys [2][256][]byte
+	sk [2][256][]byte
+	pk [2][256][]byte
 }
 
 
 type Lamport struct {
 	hashFunc  func() hash.Hash
+	blockSize int
+	bytesPerblock int
 }
 
 func pickBit(x *big.Int, shiftOffset int) uint64 {
@@ -42,20 +44,23 @@ func randomByte(size int) ([]byte, error) {
 func NewLamport(h func() hash.Hash) *Lamport {
 	return &Lamport{
 		hashFunc: h,
+		blockSize: 256,
+		bytesPerblock: 256/8,
 	}
 }
 
 func (l *Lamport) GenerateKey() ([][][]byte, [][][]byte, error)  {
 
-	var privateKeys [][][]byte
-	var publicKeys [][][]byte
-	privateKeys = append(privateKeys, [][]byte {}, [][]byte {})
-	publicKeys = append(publicKeys, [][]byte {}, [][]byte {})
+	var sk [][][]byte
+	var pk [][][]byte
+	sk = append(sk, [][]byte {}, [][]byte {})
+	pk = append(pk, [][]byte {}, [][]byte {})
+	
 	h := l.hashFunc()
 
-	for  i := 0; i < 256; i++ {
-		key1, err1 := randomByte(32)
-		key2, err2 := randomByte(32)
+	for  i := 0; i < l.blockSize ; i++ {
+		key1, err1 := randomByte(l.bytesPerblock)
+		key2, err2 := randomByte(l.bytesPerblock)
 
 		if err1 != nil {
 			return nil, nil, err1
@@ -64,31 +69,31 @@ func (l *Lamport) GenerateKey() ([][][]byte, [][][]byte, error)  {
 		if err2 != nil {
 			return nil, nil, err2
 		}
-		if len(privateKeys) == 0 {
-			privateKeys = append(privateKeys, [][]byte {})
+		if len(sk) == 0 {
+			sk = append(sk, [][]byte {})
 		}
-		privateKeys[0] = append(privateKeys[0], key1)
-		privateKeys[1] = append(privateKeys[1], key2)
+		sk[0] = append(sk[0], key1)
+		sk[1] = append(sk[1], key2)
 		
-		publicKeys[0] = append(publicKeys[0], hashBlock(h, key1))
-		publicKeys[1] = append(publicKeys[1], hashBlock(h, key2))
+		pk[0] = append(pk[0], hashBlock(h, key1))
+		pk[1] = append(pk[1], hashBlock(h, key2))
 
 	}
-	return privateKeys, publicKeys, nil
+	return sk, pk, nil
 }
 
 func (l *Lamport) Sign(msg []byte, sk [][][]byte) [][]byte {
 	var sig [][]byte
 	h := l.hashFunc()
 	//hashes the message to a 256-bit hash
-	encoded := hashBlock(h, msg)
+	hashed := hashBlock(h, msg)
 
 	//convert byte[] to big int
-	x := new(big.Int).SetBytes(encoded)
+	x := new(big.Int).SetBytes(hashed)
 	
 	var b uint64
 
-	for  i := 0; i < 256; i++ {
+	for  i := 0; i < l.blockSize; i++ {
 		// same operation as  int << i & 1 
 		if i == 0 {
 			b = pickBit(x, 0)
@@ -104,9 +109,9 @@ func (l *Lamport) Sign(msg []byte, sk [][][]byte) [][]byte {
 
 func (l *Lamport) Verify(msg []byte, sig [][]byte,  pk [][][]byte) bool {
 	h := l.hashFunc()
-	encoded := hashBlock(h, msg)
+	hashed := hashBlock(h, msg)
 
-	x := new(big.Int).SetBytes(encoded)
+	x := new(big.Int).SetBytes(hashed)
 
 	var b uint64
 
