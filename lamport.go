@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"hash"
 	"math/big"
+	"errors"
 )
 
 type Lamport struct {
@@ -41,11 +42,8 @@ func NewLamport(h func() hash.Hash) *Lamport {
 	}
 }
 
-
-func (l *Lamport) GenerateKey() ([]byte, []byte, error)  {
-	var sk []byte
-	var pk []byte
-
+func (l *Lamport) GenerateKey() (sk []byte, pk []byte, err error)  {
+	
 	h := l.hashFunc()
 
 	for  i := 0; i < l.blockSize ; i++ {
@@ -65,12 +63,16 @@ func (l *Lamport) GenerateKey() ([]byte, []byte, error)  {
 		sk = append(sk, key2...)
 		pk = append(pk, hashBlock(h, key2)...)
 	}
-
+	
 	return sk, pk, nil
 }
 
-func (l *Lamport) Sign(msg []byte, sk []byte) []byte {
-	var sig []byte
+func (l *Lamport) Sign(msg []byte, sk []byte) (sig []byte, err error) {
+
+	if len(sk) < l.bytesPerblock * l.blockSize * 2 {
+		return nil, errors.New("Lamport: private key size doesn't match the scheme")
+	}
+
 	h := l.hashFunc()
 	//hashes the message to a 256-bit hash
 	hashed := hashBlock(h, msg)
@@ -78,48 +80,48 @@ func (l *Lamport) Sign(msg []byte, sk []byte) []byte {
 	//convert byte[] to big int
 	x := new(big.Int).SetBytes(hashed)
 	
-	var b uint64
-	
 	for  i := 0; i < l.blockSize; i++ {
-		// same operation as int << 1 & 1 
-		// x is pointer, hence we either shift 0 or 1
-		if i == 0 {
-			b = pickBit(x, 0)
-		} else {
-			b = pickBit(x, 1)
-		}
-		
-		shift := (int(b) * l.blockSize * l.bytesPerblock) + (i * l.bytesPerblock)
-
-		sig = append(sig, sk[ shift:shift+l.bytesPerblock]...)	
+		sig = append(sig, l.PickBlockFromKeys( x, i, sk )...)	
 	}
 
-	return sig
+	return sig, nil
 }
 
 func (l *Lamport) Verify(msg []byte, sig []byte,  pk []byte) bool {
+
+	if len(pk) < l.bytesPerblock * l.blockSize * 2 || len(sig) < l.bytesPerblock * l.blockSize  {
+		return false
+	}
+
 	h := l.hashFunc()
 	hashed := hashBlock(h, msg)
 
 	x := new(big.Int).SetBytes(hashed)
 
-	var b uint64
-	
 	for  i := 0; i < l.blockSize; i++ {
-		// same operation as  int << i & 1 
-		if i == 0 {
-			b = pickBit(x, 0)
-		} else {
-			b = pickBit(x, 1)
-		}
-	
-		shift := (int(b) * l.blockSize * l.bytesPerblock) + (i * l.bytesPerblock)
-		sigShit := (i * l.bytesPerblock)
+		shift := (i * l.bytesPerblock)
+		block := sig[shift:shift+l.bytesPerblock]
 
-		if !bytes.Equal( pk[shift:shift+l.bytesPerblock], hashBlock(h, sig[sigShit:sigShit+l.bytesPerblock]) ) {
+		if !bytes.Equal( l.PickBlockFromKeys( x, i, pk ), hashBlock(h, block) ) {
 			return false
 		}
 	}
 
 	return true
+}
+
+func (l *Lamport) PickBlockFromKeys( x *big.Int, index int , block []byte)  []byte {
+	var b uint64
+	// same operation as int << 1 & 1 
+	// x is pointer, hence we either shift 0 or 1
+		
+	if index == 0 {
+		b = pickBit(x, 0)
+	} else {
+		b = pickBit(x, 1)
+	}
+
+	shift := (int(b) * l.blockSize * l.bytesPerblock) + (index * l.bytesPerblock)
+
+	return block[shift:shift+l.bytesPerblock]
 }

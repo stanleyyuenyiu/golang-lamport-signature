@@ -57,8 +57,10 @@ func TestSignVerify(t *testing.T) {
 
 	msg := []byte("lamport")
 
-	sig := lamport.Sign(msg, sk)
+	sig, err := lamport.Sign(msg, sk)
 
+	require.Nil(err)
+	
 	require.Equal(lamport.Verify(msg, sig, pk), true)
 
 	require.Equal(lamport.Verify(msg[1:], sig, pk), false)
