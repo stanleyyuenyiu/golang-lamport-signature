@@ -2,13 +2,12 @@ package main
 
 import (
 	"bytes"
-	 "crypto/rand"
-	 "crypto/sha256"
+	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"hash"
 	"math/big"
 )
-
 
 type Keys struct {
 	privateKeys [2][256][]byte
@@ -56,21 +55,21 @@ func Sign(msg []byte, sk [2][256][]byte) [][]byte {
 	h := sha256.New()
 	//hashes the message to a 256-bit hash
 	encoded := Hash(h, msg)
-	
+
 	//convert byte[] to big int
 	var bI big.Int
 	x := bI.SetBytes(encoded)
-	
+
 	//fmt.Printf( "%b\n",x )
 	//fmt.Printf( "%b\n",data )
 
 	for  i := 0; i < 256; i++ {
 		// same operation as  int << i & 1 
-		
+
 		b := new(big.Int).And( new(big.Int).Rsh(x, uint(i)), big.NewInt(1) ).Uint64()
 
 		// b = 1 or 0
-        sig = append(sig, sk[b][i])
+		sig = append(sig, sk[b][i])
 	}
 	return sig
 }
@@ -79,14 +78,14 @@ func Sign(msg []byte, sk [2][256][]byte) [][]byte {
 func Verify(msg []byte, sig [][]byte,  pk [2][256][]byte) bool {
 	h := sha256.New()
 	encoded := Hash(h, msg)
-	
+
 	var bI big.Int
 	x := bI.SetBytes(encoded)
 
 	for  i := 0; i < 256; i++ {
-        b := new(big.Int).And( new(big.Int).Rsh(x, uint(i)), big.NewInt(1) ).Uint64()
+		b := new(big.Int).And( new(big.Int).Rsh(x, uint(i)), big.NewInt(1) ).Uint64()
 		hashSign := Hash(h, sig[i])
-        if !bytes.Equal(pk[b][i], hashSign) {
+		if !bytes.Equal(pk[b][i], hashSign) {
 			return false
 		}
 	}
