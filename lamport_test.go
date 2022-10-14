@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"testing"
 	"github.com/stretchr/testify/require"
-
+	"math/big"
 )
 var lamport = NewLamport(sha256.New)
 var testPublicKey = "MgeQR6kMn7TrdNq3RvI8yW87mG+aPtHnN/BPcjxh+hI="
@@ -60,7 +60,7 @@ func TestSignVerify(t *testing.T) {
 	sig, err := lamport.Sign(msg, sk)
 
 	require.Nil(err)
-	
+
 	require.Equal(lamport.Verify(msg, sig, pk), true)
 
 	require.Equal(lamport.Verify(msg[1:], sig, pk), false)
@@ -68,4 +68,23 @@ func TestSignVerify(t *testing.T) {
 	require.Equal(lamport.Verify( msg, sig, []byte(testPublicKey)), false)
 
 	require.Equal(lamport.Verify( msg, []byte(testSig), pk), false)
+}
+
+func PickBlockFromKeys(t *testing.T) {
+
+	require := require.New(t)
+	// 13 = 1011
+	x := new(big.Int).SetBytes([]byte{13})
+
+	b := pickBit(x, 0)
+	require.Equal(b, uint64(1))
+
+	b = pickBit(x, 1)
+	require.Equal(b, uint64(1))
+
+	b = pickBit(x, 1)
+	require.Equal(b, uint64(0))
+
+	b = pickBit(x, 1)
+	require.Equal(b, uint64(1))
 }
