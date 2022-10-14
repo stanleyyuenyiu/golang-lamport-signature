@@ -1,10 +1,8 @@
-package main
+package lamport
 
 import (
 	"bytes"
 	"crypto/rand"
-	"crypto/sha256"
-	"fmt"
 	"hash"
 	"math/big"
 )
@@ -36,6 +34,7 @@ func randomByte(size int) ([]byte, error) {
 
 
 func NewLamport(h func() hash.Hash) *Lamport {
+
 	return &Lamport{
 		hashFunc: h,
 		blockSize: 256,
@@ -123,25 +122,8 @@ func (l *Lamport) Verify(msg []byte, sig [][]byte,  pk [][][]byte) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
 
-
-
-func main() {
-	msg := []byte("陳生")
-
-	lamport := NewLamport(sha256.New)
-
-	sk, pk, err := lamport.GenerateKey()
-
-	if err != nil {
-		fmt.Println("Error")
-		return
-	}
-
-	sig := lamport.Sign(msg, sk)
-
-	fmt.Println( lamport.Verify(msg, sig, pk) )
-}
