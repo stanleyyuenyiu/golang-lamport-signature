@@ -24,37 +24,64 @@ func pickBit(x *big.Int, shiftOffset int) uint64 {
 	return new(big.Int).And( x, big.NewInt(1) ).Uint64()
 }
 
+func hashBlock(h hash.Hash , r []byte) []byte {
+	h.Reset()
+	h.Write(r)
+	return h.Sum(nil)
+}
+
+func randomByte(size int) ([]byte, error) {
+	key := make([]byte, size)
+	if _, err := rand.Read(key); err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
+
 func NewLamport(h func() hash.Hash) *Lamport {
 	return &Lamport{
 		hashFunc: h,
 	}
 }
 
-func (l *Lamport) GenerateKey() ([2][256][]byte, [2][256][]byte, error)  {
+func (l *Lamport) GenerateKey() ([][][]byte, [][][]byte, error)  {
 
-	var privateKeys [2][256][]byte
-	var publicKeys [2][256][]byte
-
+	var privateKeys [][][]byte
+	var publicKeys [][][]byte
+	privateKeys = append(privateKeys, [][]byte {}, [][]byte {})
+	publicKeys = append(publicKeys, [][]byte {}, [][]byte {})
 	h := l.hashFunc()
 
 	for  i := 0; i < 256; i++ {
+		key1, err1 := randomByte(32)
+		key2, err2 := randomByte(32)
 
-		key1,_ := RandomByte(32)
-		key2,_ := RandomByte(32)
+		if err1 != nil {
+			return nil, nil, err1
+		}
 
-		privateKeys[0][i] = key1
-		privateKeys[1][i] = key2
-		publicKeys[0][i] = Hash(h, key1)
-		publicKeys[1][i] = Hash(h, key2)
+		if err2 != nil {
+			return nil, nil, err2
+		}
+		if len(privateKeys) == 0 {
+			privateKeys = append(privateKeys, [][]byte {})
+		}
+		privateKeys[0] = append(privateKeys[0], key1)
+		privateKeys[1] = append(privateKeys[1], key2)
+		
+		publicKeys[0] = append(publicKeys[0], hashBlock(h, key1))
+		publicKeys[1] = append(publicKeys[1], hashBlock(h, key2))
+
 	}
 	return privateKeys, publicKeys, nil
 }
 
-func (l *Lamport) Sign(msg []byte, sk [2][256][]byte) [][]byte {
+func (l *Lamport) Sign(msg []byte, sk [][][]byte) [][]byte {
 	var sig [][]byte
 	h := l.hashFunc()
 	//hashes the message to a 256-bit hash
-	encoded := Hash(h, msg)
+	encoded := hashBlock(h, msg)
 
 	//convert byte[] to big int
 	x := new(big.Int).SetBytes(encoded)
@@ -75,9 +102,9 @@ func (l *Lamport) Sign(msg []byte, sk [2][256][]byte) [][]byte {
 	return sig
 }
 
-func (l *Lamport) Verify(msg []byte, sig [][]byte,  pk [2][256][]byte) bool {
+func (l *Lamport) Verify(msg []byte, sig [][]byte,  pk [][][]byte) bool {
 	h := l.hashFunc()
-	encoded := Hash(h, msg)
+	encoded := hashBlock(h, msg)
 
 	x := new(big.Int).SetBytes(encoded)
 
@@ -91,7 +118,7 @@ func (l *Lamport) Verify(msg []byte, sig [][]byte,  pk [2][256][]byte) bool {
 			b = pickBit(x, 1)
 		}
 
-		hashSign := Hash(h, sig[i])
+		hashSign := hashBlock(h, sig[i])
 		
 		if !bytes.Equal(pk[b][i], hashSign) {
 			return false
@@ -100,19 +127,6 @@ func (l *Lamport) Verify(msg []byte, sig [][]byte,  pk [2][256][]byte) bool {
 	return true
 }
 
-func Hash(h hash.Hash , r []byte) []byte {
-	h.Reset()
-	h.Write(r)
-	return h.Sum(nil)
-}
-
-func RandomByte(size int) ([]byte, error) {
-	key := make([]byte, size)
-	if _, err := rand.Read(key); err != nil {
-		return nil, err
-	}
-	return key, nil
-}
 
 
 
@@ -121,9 +135,14 @@ func main() {
 
 	lamport := NewLamport(sha256.New)
 
-	sk, pk, _ := lamport.GenerateKey()
+	sk, pk, err := lamport.GenerateKey()
+
+	if err != nil {
+		fmt.Println("Error")
+		return
+	}
 
 	sig := lamport.Sign(msg, sk)
-	
+
 	fmt.Println( lamport.Verify(msg, sig, pk) )
 }
