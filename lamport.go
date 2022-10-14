@@ -34,7 +34,6 @@ func randomByte(size int) ([]byte, error) {
 
 
 func NewLamport(h func() hash.Hash) *Lamport {
-
 	return &Lamport{
 		hashFunc: h,
 		blockSize: 256,
@@ -42,41 +41,36 @@ func NewLamport(h func() hash.Hash) *Lamport {
 	}
 }
 
-func (l *Lamport) GenerateKey() ([][][]byte, [][][]byte, error)  {
 
-	var sk [][][]byte
-	var pk [][][]byte
-	sk = append(sk, [][]byte {}, [][]byte {})
-	pk = append(pk, [][]byte {}, [][]byte {})
-	
+func (l *Lamport) GenerateKey() ([]byte, []byte, error)  {
+	var sk []byte
+	var pk []byte
+
 	h := l.hashFunc()
 
 	for  i := 0; i < l.blockSize ; i++ {
 		key1, err1 := randomByte(l.bytesPerblock)
-		key2, err2 := randomByte(l.bytesPerblock)
-
 		if err1 != nil {
 			return nil, nil, err1
 		}
+		sk = append(sk, key1...)
+		pk = append(pk, hashBlock(h, key1)...)
+	}
 
+	for  i := 0; i < l.blockSize ; i++ {
+		key2, err2 := randomByte(l.bytesPerblock)
 		if err2 != nil {
 			return nil, nil, err2
 		}
-		if len(sk) == 0 {
-			sk = append(sk, [][]byte {})
-		}
-		sk[0] = append(sk[0], key1)
-		sk[1] = append(sk[1], key2)
-		
-		pk[0] = append(pk[0], hashBlock(h, key1))
-		pk[1] = append(pk[1], hashBlock(h, key2))
-
+		sk = append(sk, key2...)
+		pk = append(pk, hashBlock(h, key2)...)
 	}
+
 	return sk, pk, nil
 }
 
-func (l *Lamport) Sign(msg []byte, sk [][][]byte) [][]byte {
-	var sig [][]byte
+func (l *Lamport) Sign(msg []byte, sk []byte) []byte {
+	var sig []byte
 	h := l.hashFunc()
 	//hashes the message to a 256-bit hash
 	hashed := hashBlock(h, msg)
@@ -85,7 +79,7 @@ func (l *Lamport) Sign(msg []byte, sk [][][]byte) [][]byte {
 	x := new(big.Int).SetBytes(hashed)
 	
 	var b uint64
-
+	
 	for  i := 0; i < l.blockSize; i++ {
 		// same operation as int << 1 & 1 
 		// x is pointer, hence we either shift 0 or 1
@@ -95,35 +89,37 @@ func (l *Lamport) Sign(msg []byte, sk [][][]byte) [][]byte {
 			b = pickBit(x, 1)
 		}
 		
-		// b = 1 or 0
-		sig = append(sig, sk[b][i])
+		shift := (int(b) * l.blockSize * l.bytesPerblock) + (i * l.bytesPerblock)
+
+		sig = append(sig, sk[ shift:shift+l.bytesPerblock]...)	
 	}
+
 	return sig
 }
 
-func (l *Lamport) Verify(msg []byte, sig [][]byte,  pk [][][]byte) bool {
+func (l *Lamport) Verify(msg []byte, sig []byte,  pk []byte) bool {
 	h := l.hashFunc()
 	hashed := hashBlock(h, msg)
 
 	x := new(big.Int).SetBytes(hashed)
 
 	var b uint64
-
-	for  i := 0; i < 256; i++ {
+	
+	for  i := 0; i < l.blockSize; i++ {
 		// same operation as  int << i & 1 
 		if i == 0 {
 			b = pickBit(x, 0)
 		} else {
 			b = pickBit(x, 1)
 		}
+	
+		shift := (int(b) * l.blockSize * l.bytesPerblock) + (i * l.bytesPerblock)
+		sigShit := (i * l.bytesPerblock)
 
-		//compare hashedBlock with public key
-		if !bytes.Equal( pk[b][i], hashBlock(h, sig[i]) ) {
+		if !bytes.Equal( pk[shift:shift+l.bytesPerblock], hashBlock(h, sig[sigShit:sigShit+l.bytesPerblock]) ) {
 			return false
 		}
 	}
 
 	return true
 }
-
-
