@@ -94,7 +94,8 @@ func (l *Lamport) Sign(msg []byte, sk [][][]byte) [][]byte {
 	var b uint64
 
 	for  i := 0; i < l.blockSize; i++ {
-		// same operation as  int << i & 1 
+		// same operation as int << 1 & 1 
+		// x is pointer, hence we either shift 0 or 1
 		if i == 0 {
 			b = pickBit(x, 0)
 		} else {
@@ -116,16 +117,15 @@ func (l *Lamport) Verify(msg []byte, sig [][]byte,  pk [][][]byte) bool {
 	var b uint64
 
 	for  i := 0; i < 256; i++ {
-		
+		// same operation as  int << i & 1 
 		if i == 0 {
 			b = pickBit(x, 0)
 		} else {
 			b = pickBit(x, 1)
 		}
 
-		hashSign := hashBlock(h, sig[i])
-		
-		if !bytes.Equal(pk[b][i], hashSign) {
+		//compare hashedBlock with public key
+		if !bytes.Equal( pk[b][i], hashBlock(h, sig[i]) ) {
 			return false
 		}
 	}
