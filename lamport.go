@@ -6,6 +6,7 @@ import (
 	"hash"
 	"math/big"
 	"errors"
+	"log"
 )
 
 type Lamport struct {
@@ -19,9 +20,9 @@ func pickBit(x *big.Int, shiftOffset int) uint64 {
 	return new(big.Int).And( x, big.NewInt(1) ).Uint64()
 }
 
-func hashBlock(h hash.Hash , r []byte) []byte {
+func hashBlock(h hash.Hash , r *[]byte) []byte {
 	h.Reset()
-	h.Write(r)
+	h.Write(*r)
 	return h.Sum(nil)
 }
 
@@ -33,7 +34,6 @@ func randomByte(size int) ([]byte, error) {
 	return key, nil
 }
 
-
 func NewLamport(h func() hash.Hash) *Lamport {
 	return &Lamport{
 		hashFunc: h,
@@ -42,17 +42,20 @@ func NewLamport(h func() hash.Hash) *Lamport {
 	}
 }
 
-func (l *Lamport) GenerateKey() (sk []byte, pk []byte, err error)  {
+func (l *Lamport) GenerateKey() (*[]byte, *[]byte,  error)  {
 	
 	h := l.hashFunc()
-
+	
+	var sk []byte
+	var pk []byte
+	
 	for  i := 0; i < l.blockSize ; i++ {
 		key1, err1 := randomByte(l.bytesPerblock)
 		if err1 != nil {
 			return nil, nil, err1
 		}
 		sk = append(sk, key1...)
-		pk = append(pk, hashBlock(h, key1)...)
+		pk = append(pk, hashBlock(h, &key1)...)
 	}
 
 	for  i := 0; i < l.blockSize ; i++ {
@@ -61,15 +64,17 @@ func (l *Lamport) GenerateKey() (sk []byte, pk []byte, err error)  {
 			return nil, nil, err2
 		}
 		sk = append(sk, key2...)
-		pk = append(pk, hashBlock(h, key2)...)
+		pk = append(pk, hashBlock(h, &key2)...)
 	}
-	
-	return sk, pk, nil
+	log.Printf("[GenerateKey] Addrss PK:%p, SK:%p", &pk, &sk)
+	return &sk, &pk, nil
 }
 
-func (l *Lamport) Sign(msg []byte, sk []byte) (sig []byte, err error) {
+func (l *Lamport) Sign(msg *[]byte, sk *[]byte) (*[]byte,  error) {
 
-	if len(sk) < l.bytesPerblock * l.blockSize * 2 {
+	var sig []byte
+
+	if len(*sk) < l.bytesPerblock * l.blockSize * 2 {
 		return nil, errors.New("Lamport: private key size doesn't match the scheme")
 	}
 
@@ -81,28 +86,33 @@ func (l *Lamport) Sign(msg []byte, sk []byte) (sig []byte, err error) {
 	x := new(big.Int).SetBytes(hashed)
 	
 	for  i := 0; i < l.blockSize; i++ {
-		sig = append(sig, l.PickBlockFromKeys( x, i, sk )...)	
+		sig = append(sig, l.PickBlockFromKeys( x, i, *sk )...)	
 	}
-
-	return sig, nil
+	log.Printf("[Sign] Address Sig: %p", &sig)
+	return &sig, nil
 }
 
-func (l *Lamport) Verify(msg []byte, sig []byte,  pk []byte) bool {
+func (l *Lamport) Verify(msg *[]byte, sig *[]byte, pk *[]byte) bool {
+	log.Printf("[Verify] Address Message: %p", msg)
+	log.Printf("[Verify] Address Sig: %p", sig)
+	log.Printf("[Verify] Address Pk: %p", pk)
 
-	if len(pk) < l.bytesPerblock * l.blockSize * 2 || len(sig) < l.bytesPerblock * l.blockSize  {
+	sigSlice := *sig
+	log.Printf("[Verify] Address sigSlice: %p", sigSlice)
+
+	if len(*pk) < l.bytesPerblock * l.blockSize * 2 || len(sigSlice) < l.bytesPerblock * l.blockSize  {
 		return false
 	}
-
+	
 	h := l.hashFunc()
 	hashed := hashBlock(h, msg)
-
 	x := new(big.Int).SetBytes(hashed)
 
 	for  i := 0; i < l.blockSize; i++ {
 		shift := (i * l.bytesPerblock)
-		block := sig[shift:shift+l.bytesPerblock]
+		block := sigSlice[shift:shift+l.bytesPerblock]
 
-		if !bytes.Equal( l.PickBlockFromKeys( x, i, pk ), hashBlock(h, block) ) {
+		if !bytes.Equal( l.PickBlockFromKeys( x, i, *pk ), hashBlock(h, &block) ) {
 			return false
 		}
 	}

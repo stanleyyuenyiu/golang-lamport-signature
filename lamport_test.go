@@ -5,7 +5,8 @@ import (
 	"crypto/sha256"
 	"testing"
 	"github.com/stretchr/testify/require"
-	"math/big"
+	//"math/big"
+	"log"
 )
 var lamport = NewLamport(sha256.New)
 var testPublicKey = "MgeQR6kMn7TrdNq3RvI8yW87mG+aPtHnN/BPcjxh+hI="
@@ -42,8 +43,8 @@ func TestGenerateKey(t *testing.T) {
 	sk, pk, err := lamport.GenerateKey()
 
 	require.Nil(err)
-	require.Equal( len(sk), 256*32*2)
-	require.Equal( len(pk), 256*32*2)
+	require.Equal( len(*sk), 256*32*2)
+	require.Equal( len(*pk), 256*32*2)
 	
 }
 
@@ -51,40 +52,47 @@ func TestSignVerify(t *testing.T) {
 
 	require := require.New(t)
 
+	log.Printf("[TEST GenerateKey Input]")
 	sk, pk, err := lamport.GenerateKey()
-	
+	log.Printf("[TEST GenerateKey Output] Address PK:%p, SK:%p", pk, sk)
 	require.Nil(err)
 
 	msg := []byte("lamport")
 
-	sig, err := lamport.Sign(msg, sk)
+	log.Printf("[TEST Sign Input] Address Message:%p, sk:%p", &msg, sk)
+	sig, err := lamport.Sign(&msg, sk)
+	log.Printf("[TEST Sign Output] Address sig:%p", sig)
 
 	require.Nil(err)
 
-	require.Equal(lamport.Verify(msg, sig, pk), true)
-
-	require.Equal(lamport.Verify(msg[1:], sig, pk), false)
+	log.Printf("[TEST Verify Input] Address Message:%p, sig:%p, pk:%p", &msg, sig, sk)
+	require.Equal(lamport.Verify(&msg, sig, pk), true)
 	
-	require.Equal(lamport.Verify( msg, sig, []byte(testPublicKey)), false)
+	testMsg := msg[1:]
+	testPk := []byte(testPublicKey)
+	testSig := []byte(testSig)
+	require.Equal(lamport.Verify(&testMsg, sig, pk), false)
+	
+	require.Equal(lamport.Verify( &msg, sig, &testPk), false)
 
-	require.Equal(lamport.Verify( msg, []byte(testSig), pk), false)
+	require.Equal(lamport.Verify( &msg, &testSig, pk), false)
 }
 
-func PickBlockFromKeys(t *testing.T) {
+// func PickBlockFromKeys(t *testing.T) {
 
-	require := require.New(t)
-	// 13 = 1011
-	x := new(big.Int).SetBytes([]byte{13})
+// 	require := require.New(t)
+// 	// 13 = 1011
+// 	x := new(big.Int).SetBytes([]byte{13})
 
-	b := pickBit(x, 0)
-	require.Equal(b, uint64(1))
+// 	b := pickBit(x, 0)
+// 	require.Equal(b, uint64(1))
 
-	b = pickBit(x, 1)
-	require.Equal(b, uint64(1))
+// 	b = pickBit(x, 1)
+// 	require.Equal(b, uint64(1))
 
-	b = pickBit(x, 1)
-	require.Equal(b, uint64(0))
+// 	b = pickBit(x, 1)
+// 	require.Equal(b, uint64(0))
 
-	b = pickBit(x, 1)
-	require.Equal(b, uint64(1))
-}
+// 	b = pickBit(x, 1)
+// 	require.Equal(b, uint64(1))
+// }
